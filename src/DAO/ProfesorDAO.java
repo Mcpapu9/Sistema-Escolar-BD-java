@@ -16,69 +16,67 @@
 package DAO;
 
 import Modelo.ProfesorModelo;
+import util.ConexionBD;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// DAO para manejar operaciones BD de Profesores
+/**
+ * Ejemplo de implementación de DAO + VO(DTO)
+ * DAO para manejar operaciones BD de Profesores
+ */
 public class ProfesorDAO {
 
-    private Connection conexion;
-
-    public ProfesorDAO() {
-        conectarBD();
-    }
-
-    // Método para conectar a la base de datos
-    private void conectarBD() {
-        try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            conexion = DriverManager.getConnection(
-                "jdbc:mysql://localhost:3306/registro_escuela", "root", "root");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    // Ya no se requiere constructor con conectarBD() ni atributo conexion privado.
 
     // Agrega profesor a la BD
     public boolean agregarProfesor(ProfesorModelo profesor) throws SQLException {
-        // Verificar si ya existe numeroEmpleado
-        String queryBuscar = "SELECT * FROM profesor WHERE num_emp = ?";
-        PreparedStatement stmtBuscar = conexion.prepareStatement(queryBuscar);
-        stmtBuscar.setString(1, profesor.getnumeroEmpleado());
-        ResultSet rs = stmtBuscar.executeQuery();
-        if (rs.next()) {
-            return false; // Ya existe
-        }
-
-        // Insertar nuevo profesor
+        String queryBuscar = "SELECT 1 FROM profesor WHERE num_emp = ?";
         String queryInsert = "INSERT INTO profesor (nombre, edad, correo, num_emp, activo) VALUES (?, ?, ?, ?, 1)";
-        PreparedStatement stmt = conexion.prepareStatement(queryInsert);
-        stmt.setString(1, profesor.getNombre());
-        stmt.setInt(2, profesor.getEdad());
-        stmt.setString(3, profesor.getCorreo());
-        stmt.setString(4, profesor.getnumeroEmpleado());
 
-        int res = stmt.executeUpdate();
-        return res > 0;
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmtBuscar = conexion.prepareStatement(queryBuscar)) {
+
+            stmtBuscar.setString(1, profesor.getnumeroEmpleado());
+            try (ResultSet rs = stmtBuscar.executeQuery()) {
+                if (rs.next()) {
+                    return false; // Ya existe el número de empleado
+                }
+            }
+
+            try (PreparedStatement stmtInsert = conexion.prepareStatement(queryInsert)) {
+                stmtInsert.setString(1, profesor.getNombre());
+                stmtInsert.setInt(2, profesor.getEdad());
+                stmtInsert.setString(3, profesor.getCorreo());
+                stmtInsert.setString(4, profesor.getnumeroEmpleado());
+
+                int res = stmtInsert.executeUpdate();
+                return res > 0;
+            }
+        }
     }
 
     // Buscar profesor por número de empleado
     public ProfesorModelo buscarProfesor(String numeroEmpleado) throws SQLException {
         String query = "SELECT * FROM profesor WHERE num_emp = ?";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        stmt.setString(1, numeroEmpleado);
-        ResultSet rs = stmt.executeQuery();
 
-        if (rs.next()) {
-            ProfesorModelo p = new ProfesorModelo(
-                rs.getString("nombre"),
-                rs.getInt("edad"),
-                rs.getString("correo"),
-                rs.getString("num_emp")
-            );
-            p.setActivo(rs.getBoolean("activo"));
-            return p;
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query)) {
+
+            stmt.setString(1, numeroEmpleado);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    ProfesorModelo p = new ProfesorModelo(
+                        rs.getString("nombre"),
+                        rs.getInt("edad"),
+                        rs.getString("correo"),
+                        rs.getString("num_emp")
+                    );
+                    p.setActivo(rs.getBoolean("activo"));
+                    return p;
+                }
+            }
         }
         return null;
     }
@@ -87,18 +85,21 @@ public class ProfesorDAO {
     public List<ProfesorModelo> consultarTodos() throws SQLException {
         List<ProfesorModelo> lista = new ArrayList<>();
         String query = "SELECT * FROM profesor";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        ResultSet rs = stmt.executeQuery();
 
-        while (rs.next()) {
-            ProfesorModelo p = new ProfesorModelo(
-                rs.getString("nombre"),
-                rs.getInt("edad"),
-                rs.getString("correo"),
-                rs.getString("num_emp")
-            );
-            p.setActivo(rs.getBoolean("activo"));
-            lista.add(p);
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                ProfesorModelo p = new ProfesorModelo(
+                    rs.getString("nombre"),
+                    rs.getInt("edad"),
+                    rs.getString("correo"),
+                    rs.getString("num_emp")
+                );
+                p.setActivo(rs.getBoolean("activo"));
+                lista.add(p);
+            }
         }
         return lista;
     }
@@ -106,9 +107,13 @@ public class ProfesorDAO {
     // Inhabilitar profesor (cambiar estado activo)
     public boolean inhabilitarProfesor(String numeroEmpleado) throws SQLException {
         String query = "UPDATE profesor SET activo = 0 WHERE num_emp = ?";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        stmt.setString(1, numeroEmpleado);
-        int res = stmt.executeUpdate();
-        return res > 0;
+
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query)) {
+
+            stmt.setString(1, numeroEmpleado);
+            int res = stmt.executeUpdate();
+            return res > 0;
+        }
     }
 }

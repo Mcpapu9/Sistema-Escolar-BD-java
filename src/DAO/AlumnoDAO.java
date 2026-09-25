@@ -16,69 +16,67 @@
 package DAO;
 
 import Modelo.AlumnoModelo;
+import util.ConexionBD;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// DAO para manejar operaciones BD de Alumnos
+/**
+ * Ejemplo de implementación de DAO + VO(DTO)
+ * DAO para manejar operaciones BD de Alumnos
+ */
 public class AlumnoDAO {
 
-    private Connection conexion;
-
-    public AlumnoDAO() {
-        conectarBD();
-    }
-
-    // Método para conectar a la base de datos
-    private void conectarBD() {
-        try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            conexion = DriverManager.getConnection(
-                "jdbc:mysql://localhost:3306/registro_escuela", "root", "root");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    // Ya no se requiere constructor con conectarBD() ni atributo conexion privado.
 
     // Agrega alumno a la BD
     public boolean agregarAlumno(AlumnoModelo alumno) throws SQLException {
-        // Verificar si ya existe matricula
-        String queryBuscar = "SELECT * FROM alumnos WHERE matricula = ?";
-        PreparedStatement stmtBuscar = conexion.prepareStatement(queryBuscar);
-        stmtBuscar.setString(1, alumno.getMatricula());
-        ResultSet rs = stmtBuscar.executeQuery();
-        if (rs.next()) {
-            return false; // Ya existe
-        }
-
-        // Insertar nuevo alumno
+        String queryBuscar = "SELECT 1 FROM alumnos WHERE matricula = ?";
         String queryInsert = "INSERT INTO alumnos (nombre, edad, correo, matricula, activo) VALUES (?, ?, ?, ?, 1)";
-        PreparedStatement stmt = conexion.prepareStatement(queryInsert);
-        stmt.setString(1, alumno.getNombre());
-        stmt.setInt(2, alumno.getEdad());
-        stmt.setString(3, alumno.getCorreo());
-        stmt.setString(4, alumno.getMatricula());
 
-        int res = stmt.executeUpdate();
-        return res > 0;
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmtBuscar = conexion.prepareStatement(queryBuscar)) {
+
+            stmtBuscar.setString(1, alumno.getMatricula());
+            try (ResultSet rs = stmtBuscar.executeQuery()) {
+                if (rs.next()) {
+                    return false; // Ya existe la matrícula
+                }
+            }
+
+            try (PreparedStatement stmtInsert = conexion.prepareStatement(queryInsert)) {
+                stmtInsert.setString(1, alumno.getNombre());
+                stmtInsert.setInt(2, alumno.getEdad());
+                stmtInsert.setString(3, alumno.getCorreo());
+                stmtInsert.setString(4, alumno.getMatricula());
+
+                int res = stmtInsert.executeUpdate();
+                return res > 0;
+            }
+        }
     }
 
     // Buscar alumno por matrícula
     public AlumnoModelo buscarAlumno(String matricula) throws SQLException {
         String query = "SELECT * FROM alumnos WHERE matricula = ?";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        stmt.setString(1, matricula);
-        ResultSet rs = stmt.executeQuery();
 
-        if (rs.next()) {
-            AlumnoModelo a = new AlumnoModelo(
-                rs.getString("nombre"),
-                rs.getInt("edad"),
-                rs.getString("correo"),
-                rs.getString("matricula")
-            );
-            a.setActivo(rs.getBoolean("activo"));
-            return a;
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query)) {
+
+            stmt.setString(1, matricula);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    AlumnoModelo a = new AlumnoModelo(
+                        rs.getString("nombre"),
+                        rs.getInt("edad"),
+                        rs.getString("correo"),
+                        rs.getString("matricula")
+                    );
+                    a.setActivo(rs.getBoolean("activo"));
+                    return a;
+                }
+            }
         }
         return null;
     }
@@ -87,18 +85,21 @@ public class AlumnoDAO {
     public List<AlumnoModelo> consultarTodos() throws SQLException {
         List<AlumnoModelo> lista = new ArrayList<>();
         String query = "SELECT * FROM alumnos";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        ResultSet rs = stmt.executeQuery();
 
-        while (rs.next()) {
-            AlumnoModelo a = new AlumnoModelo(
-                rs.getString("nombre"),
-                rs.getInt("edad"),
-                rs.getString("correo"),
-                rs.getString("matricula")
-            );
-            a.setActivo(rs.getBoolean("activo"));
-            lista.add(a);
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                AlumnoModelo a = new AlumnoModelo(
+                    rs.getString("nombre"),
+                    rs.getInt("edad"),
+                    rs.getString("correo"),
+                    rs.getString("matricula")
+                );
+                a.setActivo(rs.getBoolean("activo"));
+                lista.add(a);
+            }
         }
         return lista;
     }
@@ -106,9 +107,13 @@ public class AlumnoDAO {
     // Inhabilitar alumno (cambiar estado activo)
     public boolean inhabilitarAlumno(String matricula) throws SQLException {
         String query = "UPDATE alumnos SET activo = 0 WHERE matricula = ?";
-        PreparedStatement stmt = conexion.prepareStatement(query);
-        stmt.setString(1, matricula);
-        int res = stmt.executeUpdate();
-        return res > 0;
+
+        try (Connection conexion = ConexionBD.obtenerConexion();
+             PreparedStatement stmt = conexion.prepareStatement(query)) {
+
+            stmt.setString(1, matricula);
+            int res = stmt.executeUpdate();
+            return res > 0;
+        }
     }
 }
